@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: org.apache.woden:woden:1.0-incubating-M7b">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/apache/woden/woden/1.0-incubating-M7b/woden-1.0-incubating-M7b.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/org/apache/woden/woden/1.0-incubating-M7b/woden-1.0-incubating-M7b-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/apache/woden/woden/1.0-incubating-M7b/woden-1.0-incubating-M7b-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

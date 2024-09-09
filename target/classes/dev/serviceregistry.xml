@@ -1,0 +1,50 @@
+<!-- ============================================================= -->
+<!-- serviceregistry.xml is for your local testing - for dev/stage/prod 
+	 use the appropriate (below) file for respective environment :
+	
+	 dev.serviceregistry.xml
+	 stage.serviceregistry.xml
+	 prod.serviceregistry.xml
+	
+	 Replace your serviceregistry.xml file with this one and place your 
+	 serviceregistry.xml in this location i.e. resources/ 
+
+	 For more info, pl visit SDF site :
+     http://zed.cisco.com/confluence/display/TDBPM/SDF+2+User+Documentation -->
+
+<!-- ============================================================= -->
+
+<!-- =============================================================
+Below is based on the example project, pl change per your project needs
+     =====
+     
+     ======================================================== -->
+     
+  <ServiceRegistry
+	xmlns="http://www.cisco.com/serviceframework/serviceregistry"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="https://www.cisco.com/serviceframework/serviceregistry/serviceregistry.xsd">
+	
+	<ServiceMeta serviceName="AtAServiceProxy" domainName="BusinessService" type="wsProxy">
+		<!-- <Parameter name="endpointUrl" value="https://wsgx-stage.cisco.com/eiam/ataws/AtAService"/> -->
+		<Parameter name="endpointUrl" value="https://wsgx-stage.cisco.com/eiam/atasearchws/AtAService"/> 
+		<Parameter name="doclitBare" value="true" />
+		<Parameter name="HTTP_SO_TIMEOUT" value="30000"/> 
+	</ServiceMeta>
+	
+	<ResourceDef name="FWK_PROPERTIES_RES">
+		<Parameter name="SET_KEY_STORE" value="true"></Parameter>
+	</ResourceDef>
+	
+	<ServiceMeta serviceName="CPAMSearch" domainName="RemoteWSService" type="wsProxy" messageType="soap" enableSLA="false">
+		 <Parameter name="endpointUrl" value="http://wsgi-stage-ermo.cisco.com:80/mdm/party-wxys1/customerAccount/search"/>
+		<!-- <Parameter name="endpointUrl" value="https://wsgx-stage.cisco.com/eiam/atasearchws/AtAService"/> -->
+		<Parameter name="doclitBare" value="true" />
+		<!-- <Parameter name="userName" value="efcpam.gen" />
+		<Parameter name="password" value="efcpam" /> -->
+		<Parameter name="userName" value="sntcpss.gen" />
+		<Parameter name="password" value="sntcpss@aaa" />
+		<Parameter name="HTTP_CONNECTION_TIMEOUT" value="1000000"/>
+		<Parameter name="HTTP_SO_TIMEOUT" value="1000000"/>
+	</ServiceMeta>
+</ServiceRegistry>

@@ -1,0 +1,587 @@
+#!/bin/bash
+logFile="./app-root/runtime/repo/.openshift/config/logging.properties"
+serverFile="./app-root/runtime/repo/.openshift/config/server.xml"
+contextFile="./app-root/runtime/repo/.openshift/config/context.xml"
+standaloneFile="./app-root/runtime/repo/.openshift/config/standalone.xml"
+outputFile="./app-root/data/$OPENSHIFT_GEAR_UUID.output.txt"
+
+preStartFile=""
+preRestartFile=""
+
+printTitleFlag=1
+printTitleFooterFlag=0
+printHeaderFlag=1
+printFooterFlag=0
+
+printOutput () {
+        if [[ $printTitleFlag == 1 ]]
+        then
+                echo "------------------------------------------------------------------------" >> $outputFile
+                echo "RECOMMENDED CONFIGURATIONS" >> $outputFile
+                echo "------------------------------------------------------------------------" >> $outputFile
+
+                printTitleFlag=0
+                printTitleFooterFlag=1
+        fi
+
+        if [[ $printHeaderFlag == 1 ]]
+        then
+                echo "in $1 file:" >> $outputFile
+                printHeaderFlag=0
+                printFooterFlag=1
+        fi
+
+        echo "  $2" >> $outputFile
+}
+
+validateTagAndValue()
+{
+       if [[ $1 != $2 ]]
+       then
+                        printOutput $6 "$4 tag is missing" >> $outputFile
+       else
+              if [[ $3 != $1 ]]
+              then
+                                        printOutput $6 "Correct value for $4 should be $5" >> $outputFile
+              fi
+       fi
+}
+
+CheckLoggingPropertiesFile () {
+        printHeaderFlag=1
+        printFooterFlag=0
+        temp=0
+
+        #Verify SimpleFormatter.format in logging.properties
+        if [[ -e $logFile ]]
+        then
+        simpleFormatter=$(grep "java.util.logging.SimpleFormatter.format\=" $logFile | wc -l)
+        simpleFormatterValue=$(grep "%1\$tY-%1\$tm-%1\$td\ %1\$tH:%1\$tM:%1\$tS\ %4\$-6s\ %2\$s\ %5\$s%6\$s%n" $logFile | wc -l)
+        if [[ $simpleFormatter == $temp ]]
+        then
+                printOutput "LOGGING.PROPERTIES" "Add java.util.logging.SimpleFormatter.format=%1\$tY-%1\$tm-%1\$td %1\$tH:%1\$tM:%1\$tS %4\$-6s %2\$s %5\$s%6\$s%n" >> $outputFile
+        else
+            if [[ $simpleFormatterValue == $temp ]]
+            then
+                printOutput "LOGGING.PROPERTIES" "Default value for java.util.logging.SimpleFormatter.format=%1\$tY-%1\$tm-%1\$td %1\$tH:%1\$tM:%1\$tS %4\$-6s %2\$s %5\$s%6\$s%n" >> $outputFile
+            fi
+        fi
+        fi
+
+        if [[ $printFooterFlag == 1 ]]
+        then
+                echo "" >> $outputFile
+                printFooterFlag=0
+        fi
+
+}
+
+CheckServerFile () {
+        printHeaderFlag=1
+        printFooterFlag=0
+        currentFileName="SERVER.XML"
+        temp=0
+
+        address=$(grep "<Connector address=\"\${OPENSHIFT_JBOSSEWS_IP}\"" $serverFile  | wc -l)
+    port=$(grep "port=\"\${OPENSHIFT_JBOSSEWS_HTTP_PORT}" $serverFile  | wc -l)
+    protocol=$(grep "protocol=\"HTTP/1.1\"" $serverFile  | wc -l)
+    connectionTimeout=$(grep "connectionTimeout=\"20000\"" $serverFile  | wc -l)
+    maxThreads=$(grep "maxThreads=" $serverFile | wc -l)
+    maxThreadsVal=$(grep "maxThreads=\"60\"" $serverFile | wc -l)
+    redirectPort=$(grep "redirectPort=\"8443\"/>" $serverFile | wc -l)
+
+    if [[ $address == $temp ]]
+    then
+        printOutput $currentFileName "Add following tag:" >> $outputFile
+        printOutput $currentFileName "<Connector address=\"\${OPENSHIFT_JBOSSEWS_IP}\"" >> $outputFile
+        printOutput $currentFileName "  port=\"\${OPENSHIFT_JBOSSEWS_HTTP_PORT}\"" >> $outputFile
+        printOutput $currentFileName "  protocol=\"HTTP\/1.1\"" >> $outputFile
+        printOutput $currentFileName "  connectionTimeout=\"20000\"" >> $outputFile
+        printOutput $currentFileName "  maxThreads=\"60\"" >> $outputFile
+        printOutput $currentFileName "  redirectPort=\"8443\"\/>" >> $outputFile
+
+        else
+        if [[ $port != $temp ]] && [[ $protocol != $temp ]] && [[ $connectionTimeout != $temp ]] && [[ $redirectPort != $temp ]]
+        then
+                if [[ $maxThreads == $temp ]]
+                then
+                printOutput $currentFileName "Add maxThreads=\"60\" after connectionTimeout=\"20000\"" >> $outputFile
+            else
+                if [[ $maxThreadsVal == $temp ]]
+                then
+                        printOutput $currentFileName "Default value for maxThread = \"60\"" >> $outputFile
+                fi
+             fi
+        fi
+    fi
+
+        # Verify the value for unpackWARs
+    unpackWar=$(grep -i unpackWARs=\"false\" $serverFile | wc -l)
+    if [[ $unpackWar == $temp ]]
+        then
+        printOutput $currentFileName "Default value for unpackWARs should be false" >> $outputFile
+    fi
+
+        # Verify the value for autoDeploy
+    autoDeploy=$(grep -i autoDeploy=\"true\" $serverFile | wc -l)
+    if [[ $autoDeploy == $temp ]]
+    then
+        printOutput $currentFileName "Default value for autoDeploy should be true" >> $outputFile
+    fi
+
+        # Check for context path
+        contextPath=$(grep -i "<Context path=\"/" $serverFile| wc -l)
+        if [[ $contextPath == $temp ]]
+        then
+                printOutput $currentFileName "Context path does not exist" >> $outputFile
+        else
+                docBase=$(grep -i "docBase=${OPENSHIFT_DEPENDENCIES_DIR}" $serverFile)
+        if [[ ${docBase} == $temp ]]
+                then
+                        printOutput $currentFileName "docbase should start with ${OPENSHIFT_DEPENDENCIES_DIR}" >> $outputFile
+                fi
+        fi
+
+        #check for <Valve className="com.redhat.valves.tomcat7.RemoteUserValve" />
+        remoteUserValve=$(grep "<\!--.*<Valve className=\"com.redhat.valves.tomcat7.RemoteUserValve\".*/>" $serverFile | wc -l)
+        if [[ $remoteUserValve != $temp ]]
+        then
+                printOutput $currentFileName "uncomment the '<Valve className=\"com.redhat.valves.tomcat7.RemoteUserValve\" />' tag" >> $outputFile
+        fi
+
+        #dsx connection url
+
+        if [[ $printFooterFlag == 1 ]]
+        then
+                echo "" >> $outputFile
+                printFooterFlag=0
+        fi
+}
+
+CheckContextFile () {
+        printHeaderFlag=1
+        printFooterFlag=0
+        currentFileName="CONTEXT.XML"
+        temp=0
+
+        resource=$(grep -i "Resource name=" $contextFile | wc -l )
+        #Check for resource tag
+        if [[ $resource == $temp ]]
+        then
+                printOutput $currentFileName "Resource tag does not exist" >> $outputFile
+        else
+                #Collect all parameters
+                maxActiveTag=$(grep -i "maxActive=" $contextFile | wc -l)
+                maxActiveCorrectValue=$(grep -i "maxActive=\"60\"" $contextFile | wc -l)
+                maxIdleTag=$(grep -i "maxIdle=" $contextFile | wc -l)
+                maxIdleCorrectValue=$(grep -i "maxIdle=\"1\"" $contextFile | wc -l)
+                initialSizeTag=$(grep -i "initialSize=" $contextFile | wc -l)
+                initialSizeCorrectValue=$(grep -i "initialSize=\"2\"" $contextFile | wc -l)
+                minIdleTag=$(grep -i "minIdle=" $contextFile | wc -l)
+                minIdleCorrectValue=$(grep -i "minIdle=\"2\"" $contextFile | wc -l)
+                jmxEnabledTag=$(grep -i "jmxEnabled=" $contextFile | wc -l)
+                jmxEnabledCorrectValue=$(grep -i "jmxEnabled=\"true\"" $contextFile | wc -l)
+                timeBetweenEvictionRunsMillisTag=$(grep -i "timeBetweenEvictionRunsMillis=" $contextFile | wc -l)
+                timeBetweenEvictionRunsMillisCorrectValue=$(grep -i "timeBetweenEvictionRunsMillis=\"180000\"" $contextFile | wc -l)
+                minEvictableIdleTimeMillisTag=$(grep -i "minEvictableIdleTimeMillis=" $contextFile | wc -l)
+                minEvictableIdleTimeMillisCorrectValue=$(grep -i "minEvictableIdleTimeMillis=\"180000\"" $contextFile | wc -l)
+                maxWaitTag=$(grep -i "maxWait=" $contextFile | wc -l)
+                maxWaitCorrectValue=$(grep -i "maxWait=\"20000\"" $contextFile | wc -l)
+                logAbandonedTag=$(grep -i "logAbandoned=" $contextFile | wc -l)
+                logAbandonedCorrectValue=$(grep -i "logAbandoned=\"false\"" $contextFile | wc -l)
+                testOnBorrowTag=$(grep -i "testOnBorrow=" $contextFile | wc -l)
+                testOnBorrowCorrectValue=$(grep -i "testOnBorrow=\"true\"" $contextFile | wc -l)
+                testOnConnectTag=$(grep -i "testOnConnect=" $contextFile | wc -l)
+                testOnConnectCorrectValue=$(grep -i "testOnConnect=\"true\"" $contextFile | wc -l)
+                suspectTimeoutTag=$(grep -i "suspectTimeout=" $contextFile | wc -l)
+                suspectTimeoutCorrectValue=$(grep -i "suspectTimeout=\"120\"" $contextFile | wc -l)
+                validationQueryTag=$(grep -i "validationQuery=" $contextFile | wc -l)
+                validationQueryCorrectValue=$(grep -i "validationQuery=\"select 1 from dual\"" $contextFile | wc -l)
+                validationIntervalTag=$(grep -i "validationInterval=" $contextFile | wc -l)
+                validationIntervalCorrectValue=$(grep -i "validationInterval=\"200\"" $contextFile | wc -l)
+                initSQLTag=$(grep -i "initSQL=" $contextFile | wc -l)
+                initSQLCorrectValue=$(grep -i "initSQL=\"select 1 from dual\"" $contextFile | wc -l)
+                removeAbandonedTag=$(grep -i "removeAbandoned=" $contextFile | wc -l)
+                removeAbandonedCorrectValue=$(grep -i "removeAbandoned=\"true\"" $contextFile | wc -l)
+                removeAbandonedTimeoutTag=$(grep -i "removeAbandonedTimeout=" $contextFile | wc -l)
+                removeAbandonedTimeoutCorrectValue=$(grep -i "removeAbandonedTimeout=\"180\"" $contextFile | wc -l)
+                maxAgeTag=$(grep -i "maxAge=" $contextFile | wc -l)
+                maxAgeCorrectValue=$(grep -i "maxAge=\"180000\"" $contextFile | wc -l)
+
+                #Check all parameters
+                validateTagAndValue $resource $maxActiveTag $maxActiveCorrectValue "maxActive" 60 $currentFileName
+                validateTagAndValue $resource $maxIdleTag $maxIdleCorrectValue "maxIdle" 1 $currentFileName
+                validateTagAndValue $resource $initialSizeTag $initialSizeCorrectValue "initialSize" 2 $currentFileName
+                validateTagAndValue $resource $minIdleTag $minIdleCorrectValue "minIdle" 2 $currentFileName
+                validateTagAndValue $resource $jmxEnabledTag $jmxEnabledCorrectValue "jmxEnabled" true $currentFileName
+                validateTagAndValue $resource $timeBetweenEvictionRunsMillisTag $timeBetweenEvictionRunsMillisCorrectValue "timeBetweenEvictionRunsMillis" 180000 $currentFileName
+                validateTagAndValue $resource $minEvictableIdleTimeMillisTag $minEvictableIdleTimeMillisCorrectValue "minEvictableIdleTimeMillis" 180000 $currentFileName
+                validateTagAndValue $resource $maxWaitTag $maxWaitCorrectValue "maxWait" 20000 $currentFileName
+                validateTagAndValue $resource $logAbandonedTag $logAbandonedCorrectValue "logAbandoned" false $currentFileName
+                validateTagAndValue $resource $testOnBorrowTag $testOnBorrowCorrectValue "testOnBorrow" true $currentFileName
+                validateTagAndValue $resource $testOnConnectTag $testOnConnectCorrectValue "testOnConnect" true $currentFileName
+                validateTagAndValue $resource $suspectTimeoutTag $suspectTimeoutCorrectValue "suspectTimeout" 120 $currentFileName
+                validateTagAndValue $resource $validationQueryTag $validationQueryCorrectValue "validationQuery" "select 1 from dual" $currentFileName
+                validateTagAndValue $resource $validationIntervalTag $validationIntervalCorrectValue "validationInterval" 200 $currentFileName
+                validateTagAndValue $resource $initSQLTag $initSQLCorrectValue "initSQL" "select 1 from dual" $currentFileName
+                validateTagAndValue $resource $removeAbandonedTag $removeAbandonedCorrectValue "removeAbandoned" true $currentFileName
+                validateTagAndValue $resource $removeAbandonedTimeoutTag $removeAbandonedTimeoutCorrectValue "removeAbandonedTimeout" 180 $currentFileName
+                validateTagAndValue $resource $maxAgeTag $maxAgeCorrectValue "maxAge" 180000 $currentFileName
+        fi
+
+        if [[ $printFooterFlag == 1 ]]
+        then
+                echo "" >> $outputFile
+                printFooterFlag=0
+        fi
+}
+
+CheckStandaloneFile () {
+        printHeaderFlag=1
+        printFooterFlag=0
+        currentFileName="STANDALONE.XML"
+        temp=0
+
+        #Check deployment-scanner
+        scanIntervalTag=$(grep -i "scan-interval=" $standaloneFile | wc -l)
+        scanIntervalCorrectValue=$(grep -i "scan-interval=\"0\"" $standaloneFile | wc -l)
+        scanEnabledTag=$(grep -i "scan-enabled=" $standaloneFile | wc -l)
+        scanEnabledCorrectValue=$(grep -i "scan-enabled=\"false\"" $standaloneFile | wc -l)
+
+        validateTagAndValue 1 $scanIntervalTag $scanIntervalCorrectValue "scan-interval" 0 $currentFileName
+        validateTagAndValue 1 $scanEnabledTag $scanEnabledCorrectValue "scan-enabled" false $currentFileName
+
+        subsystemThreads=$(grep -i "urn:jboss:domain:threads:1.0" $standaloneFile | wc -l)
+        if [[ $subsystemThreads == $temp ]]
+        then
+                printOutput $currentFileName "Tag for \"urn:jboss:domain:threads:1.0\" is missing. Add Following tag:" #Add before tag in echo >> $outputFile
+                printOutput $currentFileName "<subsystem xmlns=\"urn:jboss:domain:threads:1.0\">" >> $outputFile
+                printOutput $currentFileName "  <bounded-queue-thread-pool name=\"http-executor\" blocking=\"true\">" >> $outputFile
+                printOutput $currentFileName "  <core-threads count=\"60\"  />" >> $outputFile
+                printOutput $currentFileName "  <queue-length count=\"60\"  />" >> $outputFile
+                printOutput $currentFileName "  <max-threads count=\"60\"  />" >> $outputFile
+                printOutput $currentFileName "  <keepalive-time time=\"10\" unit=\"seconds\" />" >> $outputFile
+                printOutput $currentFileName "  </bounded-queue-thread-pool>" >> $outputFile
+                printOutput $currentFileName "</subsystem>" >> $outputFile
+        else
+                coreThreadsCountTag=$(awk '/<subsystem xmlns="urn:jboss:domain:threads:1.0">/,/<\/subsystem>/' $standaloneFile | grep "core-threads count" | wc -l)
+                coreThreadsCountCorrectValue=$(awk '/<subsystem xmlns="urn:jboss:domain:threads:1.0">/,/<\/subsystem>/' $standaloneFile | grep "core-threads count=\"60\"" | wc -l)
+                queueLengthCountTag=$(awk '/<subsystem xmlns="urn:jboss:domain:threads:1.0">/,/<\/subsystem>/' $standaloneFile | grep "queue-length count" | wc -l)
+                queueLengthCountCorrectValue=$(awk '/<subsystem xmlns="urn:jboss:domain:threads:1.0">/,/<\/subsystem>/' $standaloneFile | grep "queue-length count=\"60\"" | wc -l)
+                maxThreadsCountTag=$(awk '/<subsystem xmlns="urn:jboss:domain:threads:1.0">/,/<\/subsystem>/' $standaloneFile | grep "max-threads count" | wc -l)
+                maxThreadsCountCorrectValue=$(awk '/<subsystem xmlns="urn:jboss:domain:threads:1.0">/,/<\/subsystem>/' $standaloneFile | grep "max-threads count=\"60\"" | wc -l)
+                keepaliveTimeTag=$(awk '/<subsystem xmlns="urn:jboss:domain:threads:1.0">/,/<\/subsystem>/' $standaloneFile | grep "<keepalive-time time" | wc -l)
+                keepaliveTimeCorrectValue=$(awk '/<subsystem xmlns="urn:jboss:domain:threads:1.0">/,/<\/subsystem>/' $standaloneFile | grep "<keepalive-time time=\"10\" unit=\"seconds\"" | wc -l)
+
+                validateTagAndValue 1 $coreThreadsCountTag $coreThreadsCountCorrectValue "core-threads count" 60 $currentFileName
+                validateTagAndValue 1 $queueLengthCountTag $queueLengthCountCorrectValue "queue-length count" 60 $currentFileName
+                validateTagAndValue 1 $maxThreadsCountTag $maxThreadsCountCorrectValue "max-threads count" 60 $currentFileName
+                validateTagAndValue 1 $keepaliveTimeTag $keepaliveTimeCorrectValue "keepalive-time time" 10 $currentFileName
+        fi
+
+        subsystemWeb=$(grep -i "urn:jboss:domain:web:1.1" $standaloneFile | wc -l)
+        if [[ $subsystemWeb == $temp ]]
+        then
+                printOutput $currentFileName "Tag for \"urn:jboss:domain:web:1.1\" is missing. Add Following tag:"  #Add before tag in echo >> $outputFile
+                printOutput $currentFileName "<subsystem xmlns=\"urn:jboss:domain:web:1.1\" default-virtual-server=\"default-host\" native=\"false\">" >> $outputFile
+                printOutput $currentFileName "  <connector name=\"http\"" >> $outputFile
+                printOutput $currentFileName "          protocol=\"HTTP/1.1\"" >> $outputFile
+                printOutput $currentFileName "          scheme=\"http\"" >> $outputFile
+                printOutput $currentFileName "          socket-binding=\"http\"" >> $outputFile
+                printOutput $currentFileName "          executor=\"http-executor\"/>" >> $outputFile
+                printOutput $currentFileName "</subsystem>" >> $outputFile
+        fi
+
+        #check <datasource> tags
+        dataSourceTagCount=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile |  grep "</datasource>" | wc -l)
+        if [[ $dataSourceTagCount != $temp ]]
+        then
+                #collect values under <pool> tag
+                minPoolSizeTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<min-pool-size>" | wc -l)
+                minPoolSizeCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<min-pool-size>2</min-pool-size>" | wc -l)
+                maxPoolSizeTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<max-pool-size>" | wc -l)
+                maxPoolSizeCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<max-pool-size>20</max-pool-size>" | wc -l)
+                prefillTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<prefill>" | wc -l)
+                prefillCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<prefill>true</prefill>" | wc -l)
+                useStrictMinTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<use-strict-min>" | wc -l)
+                useStrictMinCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<use-strict-min>false</use-strict-min>" | wc -l)
+
+                #validating values under <pool> tag
+                validateTagAndValue $dataSourceTagCount $minPoolSizeTag $minPoolSizeCorrectValue "min-pool-size" 2 $currentFileName
+                validateTagAndValue $dataSourceTagCount $maxPoolSizeTag $maxPoolSizeCorrectValue "max-pool-size" 20 $currentFileName
+                validateTagAndValue $dataSourceTagCount $prefillTag $prefillCorrectValue "prefill" true $currentFileName
+                validateTagAndValue $dataSourceTagCount $useStrictMinTag $useStrictMinCorrectValue "use-strict-min" false $currentFileName
+
+                #collect values under <validation> tag
+                checkValidConnectionSqlTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<validate-on-match>" | wc -l)
+                checkValidConnectionSqlCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<check-valid-connection-sql>select 1 from dual</check-valid-connection-sql>" | wc -l)
+                validateOnMatchTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<validate-on-match>" | wc -l)
+                validateOnMatchCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<background-validation>true</background-validation>" | wc -l)
+                backgroundValidationTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<background-validation>" | wc -l)
+                backgroundValidationCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<background-validation>true</background-validation>" | wc -l)
+                backgroundValidationMillisTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<background-validation-millis>" | wc -l)
+                backgroundValidationMillisCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<background-validation-millis>180000</background-validation-millis>" | wc -l)
+
+                #validating values under <validation> tag
+                validateTagAndValue $dataSourceTagCount $checkValidConnectionSqlTag $checkValidConnectionSqlCorrectValue "check-valid-connection-sql" "select 1 from dual" $currentFileName
+                validateTagAndValue $dataSourceTagCount $validateOnMatchTag $validateOnMatchCorrectValue "validate-on-match" false $currentFileName
+                validateTagAndValue $dataSourceTagCount $backgroundValidationTag $backgroundValidationCorrectValue "background-validation" true $currentFileName
+                validateTagAndValue $dataSourceTagCount $backgroundValidationMillisTag $backgroundValidationMillisCorrectValue "background-validation-millis" 180000 $currentFileName
+
+                #collect values under <timeout> tag
+                blockingTimeoutMillisTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<blocking-timeout-millis>" | wc -l)
+                blockingTimeoutMillisCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<blocking-timeout-millis>30000</blocking-timeout-millis>" | wc -l)
+                idleTimeoutMinutesTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<blocking-timeout-millis>" | wc -l)
+                idleTimeoutMinutesCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<idle-timeout-minutes>5</idle-timeout-minutes>" | wc -l)
+                queryTimeoutTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<query-timeout>" | wc -l)
+                #<!- This value is in seconds. Please make sure to mention more than max running query time from application. For ex Query runs for 180 seconds, mention as 200 ->
+                queryTimeoutCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<query-timeout>0</query-timeout>" | wc -l)
+
+                #validating values under <timeout> tag
+                validateTagAndValue $dataSourceTagCount $blockingTimeoutMillisTag $blockingTimeoutMillisCorrectValue "blocking-timeout-millis" 30000 $currentFileName
+                validateTagAndValue $dataSourceTagCount $idleTimeoutMinutesTag $idleTimeoutMinutesCorrectValue "idle-timeout-minutes" 5 $currentFileName
+                validateTagAndValue $dataSourceTagCount $queryTimeoutTag $queryTimeoutCorrectValue "query-timeout" 0 $currentFileName
+
+                #collect values under <statement> tag
+                trackStatementsTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<track-statements>" | wc -l)
+                trackStatementsCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<track-statements>false</track-statements>" | wc -l)
+                preparedStatementCacheSizeTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<prepared-statement-cache-size>" | wc -l)
+                preparedStatementCacheSizeCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<prepared-statement-cache-size>0</prepared-statement-cache-size>" | wc -l)
+                sharePreparedStatementsTag=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<share-prepared-statements>" | wc -l)
+                sharePreparedStatementsCorrectValue=$(awk '/<datasources>/,/<\/datasources>/' $standaloneFile | grep "<share-prepared-statements>false</share-prepared-statements>" | wc -l)
+
+                #validating values under <statement> tag
+                validateTagAndValue $dataSourceTagCount $trackStatementsTag $trackStatementsCorrectValue "track-statements" false $currentFileName
+                validateTagAndValue $dataSourceTagCount $preparedStatementCacheSizeTag $preparedStatementCacheSizeCorrectValue "prepared-statement-cache-size" 0 $currentFileName
+                validateTagAndValue $dataSourceTagCount $sharePreparedStatementsTag $sharePreparedStatementsCorrectValue "share-prepared-statements" false $currentFileName
+        fi
+
+        connectionDefinitionTagCount=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile| grep -o "</connection-definition>" | wc -l)
+        if [[ $connectionDefinitionTagCount != $temp ]]
+        then
+                #collect values under <pool> tag
+                minPoolSizeTagJMS=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile | grep "<min-pool-size>" | wc -l)
+                minPoolSizeCorrectValueJMS=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile | grep "<min-pool-size>2</min-pool-size>" | wc -l)
+                maxPoolSizeTagJMS=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile | grep "<max-pool-size>" | wc -l)
+                maxPoolSizeCorrectValueJMS=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile | grep "<max-pool-size>20</max-pool-size>" | wc -l)
+                prefillTagJMS=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile | grep "<prefill>" | wc -l)
+                prefillCorrectValueJMS=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile | grep "<prefill>true</prefill>" | wc -l)
+                useStrictMinTagJMS=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile | grep "<use-strict-min>" | wc -l)
+                useStrictMinCorrectValueJMS=$(awk '/<connection-definition/,/\/connection-definition>/' $standaloneFile | grep "<use-strict-min>false</use-strict-min>" | wc -l)
+
+                #validating values under <pool> tag
+                validateTagAndValue $connectionDefinitionTagCount $minPoolSizeTagJMS $minPoolSizeCorrectValueJMS "min-pool-size" 2 $currentFileName
+                validateTagAndValue $connectionDefinitionTagCount $maxPoolSizeTagJMS $maxPoolSizeCorrectValueJMS "max-pool-size" 20 $currentFileName
+                validateTagAndValue $connectionDefinitionTagCount $prefillTagJMS $prefillCorrectValueJMS "prefill" true $currentFileName
+                validateTagAndValue $connectionDefinitionTagCount $useStrictMinTagJMS $useStrictMinCorrectValueJMS "use-strict-min" false $currentFileName
+        fi
+
+        if [[ $printFooterFlag == 1 ]]
+        then
+                echo "" >> $outputFile
+                printFooterFlag=0
+        fi
+}
+
+CheckPreScripts () {
+        printHeaderFlag=1
+        printFooterFlag=0
+        currentFileName=$1
+        temp=0
+
+        #$fileFormat = $(file $2 | grep "CRLF" | wc -l)
+        #file format check
+        if file $2 | grep "CRLF"
+        then
+                printOutput $currentFileName "$1 file is in Windows format. Change it to Unix format" >> $outputFile
+        else
+                #ojdbc6 jar
+                ojdbc12c=$(grep "/opt/oracle/product/current11G/jdbc/lib" $2 | wc -l)
+                ojdbc11=$(grep "/opt/oracle/product/current/jdbc/lib" $2 | wc -l)
+
+                #ojdbcJarFile
+                if [[ $ojdbc12c == $temp ]] && [[ $ojdbc11 == $temp ]]
+                then
+                        printOutput $currentFileName "export /opt/oracle/product/current/jdbc/lib is missing, if it application is using ojdbc11" >> $outputFile
+                        printOutput $currentFileName "export /opt/oracle/product/current11G/jdbc/lib is missing, if it application is using ojdbc12c" >> $outputFile
+                fi
+
+                #cisco.life
+                lifecycleDev=$(grep -i "Dcisco.life=dev" $2 | wc -l)
+                lifecycleStg=$(grep -i "Dcisco.life=stage" $2 | wc -l)
+                lifecycleProd=$(grep -i "Dcisco.life=prod" $2 | wc -l)
+
+                if [[  $lifecycleDev != 2 ]]
+                then
+                        printOutput $currentFileName "set -Dcisco.life=dev in JAVA_OPTS_EXT for dev and default" >> $outputFile
+                fi
+                if [[  $lifecycleStg == $temp ]]
+                then
+                        printOutput $currentFileName "set -Dcisco.life=stage in JAVA_OPTS_EXT for the stage" >> $outputFile
+                fi
+                if [[  $lifecycleProd == $temp ]]
+                then
+                        printOutput $currentFileName "set -Dcisco.life=prod in JAVA_OPTS_EXT for prod" >> $outputFile
+                fi
+
+                #LDAP URLs
+                nonProdLDAP=$(grep -i "export OPENSHIFT_CISCO_LDAP=\"ldap://dsxstage.cisco.com:389\"" $2 | wc -l)
+                prodLDAP=$(grep -i "export OPENSHIFT_CISCO_LDAP=\"ldap://dsx.cisco.com:389\"" $2 | wc -l)
+
+                if [[ $nonProdLDAP != 3 ]]
+                then
+                        printOutput $currentFileName "use export OPENSHIFT_CISCO_LDAP=\"ldap://dsxstage.cisco.com:389\" for dev, stage and default" >> $outputFile
+                fi
+
+                if [[ $prodLDAP == $temp ]]
+                then
+                        printOutput $currentFileName "use export OPENSHIFT_CISCO_LDAP=\"ldap://dsx.cisco.com:389\" for prod" >> $outputFile
+                fi
+
+                #REs
+                devRE=$(grep -i "\*dev" $2 | wc -l)
+                stageRE=$(grep -i "\*stage|\*stg" $2 | wc -l)
+                prodRE=$(grep -i "\*prod|\*prd" $2 | wc -l)
+                defaultRE=$(grep -i "\*)" $2 | wc -l)
+
+                if [[ $devRE == $temp ]]
+                then
+                        printOutput $currentFileName "use *dev) for the dev environment" >> $outputFile
+                fi
+
+                if [[ $stageRE == $temp ]]
+                then
+                        printOutput $currentFileName "use *stage|*stg) for the stage environment" >> $outputFile
+                fi
+
+                if [[ $prodRE == $temp ]]
+                then
+                        printOutput $currentFileName "use *prod|*prd) for the prod environment" >> $outputFile
+                fi
+
+                if [[ $defaultRE == $temp ]]
+                then
+                        printOutput $currentFileName "use *) for the default environment" >> $outputFile
+                fi
+        fi
+
+        if [[ $printFooterFlag == 1 ]]
+        then
+                echo "" >> $outputFile
+                printFooterFlag=0
+        fi
+}
+
+#for Tomcat applications
+if [[ -e $serverFile ]] || [[ -e $contextFile ]]
+then
+        #pre_start and pre_restart files
+        preStartFile="./app-root/runtime/repo/.openshift/action_hooks/pre_start_jbossews"
+        preRestartFile="./app-root/runtime/repo/.openshift/action_hooks/pre_restart_jbossews"
+        preStartFile_v="./app-root/runtime/repo/.openshift/action_hooks/pre_start_jbossews-2.0"
+        preRestartFile_v="./app-root/runtime/repo/.openshift/action_hooks/pre_restart_jbossews-2.0"
+
+        if [[ -e $preStartFile ]]
+        then
+                CheckPreScripts "pre_start_jbossews.sh" $preStartFile
+        elif [[ -e $preStartFile_v ]]
+        then
+                CheckPreScripts "pre_start_jbossews.sh" $preStartFile_v
+        elif [[ ! -e $preStartFile ]] && [[ ! -e $preStartFile_v ]]
+        then
+                echo "pre_start_jbossews file does not exist" >> $outputFile
+                echo " " >> $outputFile
+        else
+                echo " " >> $outputFile
+        fi
+
+        if [[ -e $preRestartFile ]]
+        then
+                CheckPreScripts "pre_restart_jbossews.sh" $preRestartFile
+        elif [[ -e $preRestartFile_v ]]
+        then
+                CheckPreScripts "pre_restart_jbossews.sh" $preRestartFile_v
+        elif [[ ! -e $preRestartFile ]] && [[ ! -e $preRestartFile_v ]]
+        then
+                echo "pre_restart_jbossews file does not exist" >> $outputFile
+                echo " " >> $outputFile
+        else
+                echo " " >> $outputFile
+        fi
+fi
+
+if [[ -e $serverFile ]]
+then
+    CheckServerFile
+	elif [[ ! -e $serverFile ]] && [[ -e $standaloneFile ]]
+    then
+        echo " " >> $outputFile
+    else
+        echo "server.xml file does not exist" >> $outputFile
+        echo " " >> $outputFile
+fi
+
+if [[ -e $contextFile ]]
+then
+    CheckContextFile
+elif [[ ! -e $contextFile ]] && [[ -e $standaloneFile ]]
+then
+    echo " " >> $outputFile
+else
+    echo "context.xml file does not exist" >> $outputFile
+    echo " " >> $outputFile
+fi
+
+if [[ -e $standaloneFile ]]
+then
+    #pre_start and pre_restart files
+    preStartFile="./app-root/runtime/repo/.openshift/action_hooks/pre_start_jbosseap"
+    preRestartFile="./app-root/runtime/repo/.openshift/action_hooks/pre_restart_jbosseap"
+
+    if [[ -e $preStartFile ]]
+    then
+        CheckPreScripts "pre_start_jbosseap.sh" $preStartFile
+    else
+        echo "pre_start_jbosseap file does not exist" >> $outputFile
+        echo " " >> $outputFile
+    fi
+
+    if [[ -e $preRestartFile ]]
+    then
+        CheckPreScripts "pre_restart_jbosseap.sh" $preRestartFile
+    else
+        echo "pre_restart_jbosseap file does not exist" >> $outputFile
+        echo " " >> $outputFile
+    fi
+	elif [[ -e $serverFile  ||  -e $contextFile ]] && [[ ! -e $standaloneFile ]]
+	then
+		echo " " >> $outputFile
+else
+	echo "standalone.xml file does not exist" >> $outputFile
+	echo " " >> $outputFile
+fi
+if [[ $printTitleFooterFlag == 1 ]]
+then
+        echo "Please refer this wiki for more help : https://wiki.cisco.com/pages/viewpage.action?pageId=14196515" >> $outputFile
+        echo "------------------------------------------------------------------------" >> $outputFile
+        printTitleFooterFlag=0
+#        PWD=`perl -e 'print pack "H*","5465616d7730726b"'`
+#        /usr/bin/expect <<EOD
+#        spawn scp -q -r $outputFile xxlaeadm@laeusr-prod2-01:/opt/gen/xxlaeadm/test/
+#        expect -exact "password: "
+#        send "$PWD\r"
+#        expect -exact "$ "
+#EOD
+#cd
+#rm $outputFile
+fi
+
+# Copy output file to laeusr-prod2-01 host
+PWD=`perl -e 'print pack "H*","5465616d7730726b"'`
+/usr/bin/expect <<EOD
+spawn scp -q -r $outputFile xxlaeadm@laeusr-prod2-01:/opt/gen/xxlaeadm/test/
+expect -exact "password: "
+send "$PWD\r"
+expect -exact "$ "
+EOD
+rm $outputFile

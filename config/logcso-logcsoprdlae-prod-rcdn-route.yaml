@@ -1,0 +1,16 @@
+kind: "Route"
+apiVersion: "v1"
+metadata:
+  name: "logcso-prod-ext-rcdn-test"
+  labels:
+     component: "logcso-prod-ext-rcdn"
+spec:
+   host: "logcso-prod-rcdn.cisco.com"
+   to:
+     kind: "Service"
+     name: "logcso-prod-ext-rcdn-svc"
+   port:
+     targetPort: "web"
+   tls:
+     insecureEdgeTerminationPolicy: Allow
+     termination: edge

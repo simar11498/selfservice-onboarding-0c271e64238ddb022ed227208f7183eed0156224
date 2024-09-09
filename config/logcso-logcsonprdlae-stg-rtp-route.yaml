@@ -1,0 +1,16 @@
+kind: "Route"
+apiVersion: "v1"
+metadata:
+  name: "logcso-stg-ext-rtp-test"
+  labels:
+     component: "logcso-stg-ext-rtp"
+spec:
+   host: "cae-logcso-stage.cisco.com"
+   to:
+     kind: "Service"
+     name: "logcso-stg-ext-rtp-svc"
+   port:
+     targetPort: "web"
+   tls:
+     insecureEdgeTerminationPolicy: Allow
+     termination: edge

@@ -1,0 +1,63 @@
+#!/bin/bash
+
+echo "Time in deploy"
+echo $(date)
+
+ 
+echo "deploy called ..........."
+appname=`echo $OPENSHIFT_APP_NAME`
+jbossapp=`echo $OPENSHIFT_JBOSSEAP_DIR`
+tomcatapp=`echo $OPENSHIFT_JBOSSEWS_DIR`
+
+case "$appname" in
+*dev) targetjar="dev";;
+*stage|*stg) targetjar="stage";;
+*lt) targetjar="lt";;
+*prod|*prd) targetjar="prod";;
+*) targetjar="dev";;
+esac
+
+echo "*************************************************"
+
+echo "deploy start if condition called ..........."
+if [ "${tomcatapp}" != "" ] ; then
+echo "tomcat script condition called ..........."
+ls -al $OPENSHIFT_HOMEDIR/app-deployments/current/dependencies/jbossews/webapps
+cd $OPENSHIFT_HOMEDIR/app-deployments/current/dependencies/jbossews/webapps
+fi
+
+if [ "${tomcatapp}" != "" ] ; then
+echo "tomcat script condition called ..........."
+ls -al $OPENSHIFT_HOMEDIR/app-root/runtime/dependencies/jbossews/webapps
+cd $OPENSHIFT_HOMEDIR/app-root/runtime/dependencies/jbossews/webapps
+fi
+
+
+for i in `ls -1 *.war` ;do
+mkdir temp
+echo "------------------------------------------------------"
+echo $i
+echo "------------------------------------------------------"
+unzip -o $i -d temp
+cd temp
+echo $(pwd)
+echo $(ls -lrt)
+
+#mv WEB-INF/classes/$targetjar/* $OPENSHIFT_JBOSSEWS_DIR/work/Catalina/localhost/ssueap/WEB-INF/classes
+#mv WEB-INF/classes/common/* $OPENSHIFT_JBOSSEWS_DIR/work/Catalina/localhost/ssueap/WEB-INF/classes
+echo "-------------------------------------------------------------------------------------------"
+echo $(ls -lrt WEB-INF/classes/$targetjar/*)
+echo $(ls -lrt WEB-INF/classes/common/*)
+echo $(pwd)
+echo "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"
+mv WEB-INF/classes/$targetjar/* WEB-INF/classes/
+mv WEB-INF/classes/common/* WEB-INF/classes/
+jar -cvf ${i} *
+mv ${i} ../
+echo "$i"
+echo $(ls -lrt ../)
+echo "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+echo $(pwd)
+cd ..
+rm -fr temp
+done

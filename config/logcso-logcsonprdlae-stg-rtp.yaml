@@ -1,0 +1,141 @@
+kind: "Service"
+apiVersion: "v1"
+metadata:
+  name: "logcso-stg-ext-rtp-svc"
+spec:
+  ports:
+    - name: "web"
+      protocol: "TCP"
+      port: 8080
+  selector:
+    name: "logcso-stg-ext-rtp"
+  type: "ClusterIP"
+  sessionAffinity: "None"
+---
+kind: "Deployment"
+apiVersion: "apps/v1"
+metadata:
+  annotations:
+    lae_uuid: "logcsonprdlae-mm5b253xstg"
+  name: "logcso-stg-ext-rtp"
+spec:
+  selector:
+    matchLabels:
+      name: "logcso-stg-ext-rtp"
+  template:
+    metadata:
+      labels:
+        name: "logcso-stg-ext-rtp"
+      annotations:
+        app_version: 'latest'
+    spec:
+      imagePullSecrets:
+        - name: "services-ts-others-sntcselfonboard-logcso-read-gen-pull-secret"
+      containers:
+        - name: "logcso-stg-ext-rtp"
+          image: "containers.cisco.com/services_ts_others/sntcselfonboard_logcso:__IMAGETAG__"
+          ports:
+            - containerPort: 8080
+              protocol: "TCP"
+          env:
+            - name: "OPENSHIFT_APP_NAME"
+              value: "logcsoextrtpstg"
+
+            - name: "JAVA_OPTS_EXT"
+              value: "-javaagent:/opt/AppDServerAgent/javaagent.jar -Dappdynamics.agent.nodeName=$HOSTNAME -XX:MaxMetaspaceSize=512m -XX:+AggressiveOpts -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Djava.net.preferIPv4Stack=true -Dfile.encoding=UTF-8 -Djava.net.preferIPv4Stack=true -Dorg.apache.jasper.runtime.BodyContentImpl.LIMIT_BUFFER=true -Dorg.apache.jasper.runtime.JspFactoryImpl.USE_POOL=false -Dorg.apache.tomcat.util.http.ServerCookie.ALLOW_EQUALS_IN_VALUE=true -XX:+DisableExplicitGC -Xss512k -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${OPENSHIFT_LOG_DIR} -verbose:gc -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+PrintGCApplicationStoppedTime -XX:+UseGCLogFileRotation -XX:GCLogFileSize=5M -XX:NumberOfGCLogFiles=4 -Xloggc:${OPENSHIFT_LOG_DIR}gc.log -XX:+PrintTenuringDistribution -XX:ActiveProcessorCount=8"
+
+            - name: JAVA_HEAP_MIN_MAX
+              value: "-Xms512m -Xmx2048m"
+            
+            - name: hostname
+              valueFrom:
+               fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+            -
+              name: APPDYNAMICS_CONTROLLER_HOST_NAME
+              value: "cisco1nonprod.saas.appdynamics.com"
+            -
+              name: APPDYNAMICS_AGENT_ACCOUNT_NAME
+              value: "cisco1nonprod"
+            -
+              name: APPDYNAMICS_AGENT_APPLICATION_NAME
+              value: "Serviceability"
+            -
+              name: APPDYNAMICS_AGENT_TIER_NAME
+              value: "Serviceability"
+            -
+              name: APPDYNAMICS_CONTROLLER_PORT
+              value: "443"
+            -
+              name: APPDYNAMICS_CONTROLLER_SSL_ENABLED
+              value: "true"
+            -
+              name: APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY
+              value: "null"
+             
+          terminationGracePeriodSeconds: 30
+          resources:
+            limits:
+              memory: 1.5Gi
+            requests:
+              cpu: .08
+          volumeMounts:
+            - name: podinfo
+              mountPath: /etc/metadata
+              readOnly: false
+            - mountPath: "/opt/webserver/logs"
+              name: "logcso-stg-ext-rtp"
+            - name: "logcso-stg-ext-rtp-app-logs"
+              mountPath: /home/jboss/lae-home/app-root/logs
+            - name: "logcso-stg-ext-rtp-app-data"
+              mountPath: /home/jboss/data
+            - name: "logcso-stg-ext-rtp-app-tmp"
+              mountPath: /tmp
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            capabilities: {}
+            privileged: false
+          #readinessProbe:
+          #  httpGet:
+          #    path: "/"
+          #    port: 8080
+          #  initialDelaySeconds: 15
+          #  timeoutSeconds: 1
+          #livenessProbe:
+          #  exec:
+          #    command:
+          #      - "/bin/true"
+          #  initialDelaySeconds: 15
+          #  timeoutSeconds: 1
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
+              -
+                path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations
+        - name: "logcso-stg-ext-rtp"
+          emptydir: {}
+        - name: "logcso-stg-ext-rtp-app-logs"
+          emptydir: {}
+        - name: "logcso-stg-ext-rtp-app-data"
+          emptydir: {}
+        - name: "logcso-stg-ext-rtp-app-tmp"
+          emptydir: {}
+      restartPolicy: "Always"
+      dnsPolicy: "ClusterFirst"
+  replicas: 2
+  triggers:
+    -
+      type: "ConfigChange"
+  strategy:
+    type: "RollingUpdate"
+    rollingParams:
+      updatePeriodSeconds: 1
+      intervalSeconds: 1
+      timeoutSeconds: 300

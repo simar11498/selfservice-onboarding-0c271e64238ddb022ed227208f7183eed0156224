@@ -1,0 +1,16 @@
+kind: "Route"
+apiVersion: "v1"
+metadata:
+  name: "logcso-prod-ext-alln-test"
+  labels:
+     component: "logcso-prod-ext-alln"
+spec:
+   host: "logcso-prod-alln.cisco.com"
+   to:
+     kind: "Service"
+     name: "logcso-prod-ext-alln-svc"
+   port:
+     targetPort: "web"
+   tls:
+     insecureEdgeTerminationPolicy: Allow
+     termination: edge

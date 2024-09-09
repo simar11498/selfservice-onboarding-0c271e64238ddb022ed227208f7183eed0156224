@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+  <display-name>ssueap</display-name>
+   <welcome-file-list>
+        <welcome-file>ConvergenceLandingPageServlet</welcome-file>
+    </welcome-file-list>
+ 	<resource-ref>
+		<description>Datasource</description>
+		<res-ref-name>jdbc/obsDBSource</res-ref-name>
+		<res-type>javax.sql.DataSource</res-type>
+		<res-auth>Container</res-auth>
+	</resource-ref>
+	<resource-ref>
+		<description>OVDatasource</description>
+		<res-ref-name>jdbc/ovDBSource</res-ref-name>
+		<res-type>javax.sql.DataSource</res-type>
+		<res-auth>Container</res-auth>
+	</resource-ref>
+	<filter>
+	   <filter-name>SimpleCORSFilter</filter-name>
+	   <filter-class>com.cisco.cssp.init.spring.SimpleCORSFilter</filter-class>
+	</filter>
+	<filter-mapping>
+	   <filter-name>SimpleCORSFilter</filter-name>
+	   <url-pattern>/*</url-pattern>
+	</filter-mapping>
+	
+</web-app>

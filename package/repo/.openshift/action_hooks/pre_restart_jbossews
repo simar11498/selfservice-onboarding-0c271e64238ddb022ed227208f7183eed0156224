@@ -1,0 +1,47 @@
+#!/bin/bash
+chmod 755 $OPENSHIFT_HOMEDIR/app-root/repo/.openshift/action_hooks/deploy
+bash $OPENSHIFT_HOMEDIR/app-root/repo/.openshift/action_hooks/deploy
+export ORACLE_HOME="/opt/oracle/product/current"
+export LD_LIBRARY_PATH="/opt/oracle/product/current/lib"
+export CLASSPATH="/opt/oracle/product/current/jdbc/lib/ojdbc6.jar"
+ 
+appname=`echo $OPENSHIFT_APP_NAME`
+export JAVA_OPTS_EXT="${JAVA_OPTS_EXT} -Djdk.tls.client.protocols=TLSv1.2 -Dhttps.protocols=TLSv1.2"
+case "$appname" in
+ 
+  *dev)  export JAVA_OPTS_EXT="${JAVA_OPTS_EXT} -Dcisco.life=dev"
+               export OPENSHIFT_DB_URL="jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ocm-i-nprd)(PORT=1600))(CONNECT_DATA=(SERVICE_NAME=CAFI5DEV.CISCO.COM)))"
+               export OPENSHIFT_DB_USERNAME="IBNG_APPL"
+               export OPENSHIFT_DB_PASSWORD="fe5475362b08699f856530a9b8cd41d5"
+               export OPENSHIFT_OV_DB_URL="jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ocm-i-nprd)(PORT=1600))(CONNECT_DATA=(SERVICE_NAME=cafi2stg.cisco.com)))"
+               export OPENSHIFT_OV_DB_USERNAME="NRT_ADMIN"
+               export OPENSHIFT_OV_DB_PASSWORD="6ad8d876ccc6351a30a44001603dd9f9"
+               ;;
+ 
+  *stage|*stg)  export JAVA_OPTS_EXT="${JAVA_OPTS_EXT} -Dcisco.life=stage"
+  export OPENSHIFT_DB_URL="jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ocm-i-nprd)(PORT=1600)) (CONNECT_DATA=(SERVICE_NAME=CAFI5STG.CISCO.COM)))"
+               export OPENSHIFT_DB_USERNAME="IBNG_APPL"
+               export OPENSHIFT_DB_PASSWORD="ad2612c373138dbcd48098e6c9f810bf"
+               export OPENSHIFT_OV_DB_URL="jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ocm-i-nprd)(PORT=1600))(CONNECT_DATA=(SERVICE_NAME=cafi2stg.cisco.com)))"
+               export OPENSHIFT_OV_DB_USERNAME="NRT_ADMIN"
+               export OPENSHIFT_OV_DB_PASSWORD="6ad8d876ccc6351a30a44001603dd9f9"
+               ;;
+ 
+  *prod|*prd)  export JAVA_OPTS_EXT="${JAVA_OPTS_EXT} -Dcisco.life=prod"
+ 	export OPENSHIFT_DB_URL="jdbc:oracle:thin:@(DESCRIPTION=(CONNECT_TIMEOUT=5)(TRANSPORT_CONNECT_TIMEOUT=3)(RETRY_COUNT=1)(ADDRESS_LIST=(LOAD_BALANCE=ON)(FAILOVER=ON)(ADDRESS=(PROTOCOL=TCP)(HOST=scan-prd-072)(PORT=1541))(ADDRESS=(PROTOCOL=TCP)(HOST=scan-prd-073)(PORT=1541)))(CONNECT_DATA=(SERVICE_NAME=CAFI5PRD.cisco.com)(SERVER=DEDICATED)))"
+               export OPENSHIFT_DB_USERNAME="IBNG_APPL"
+               export OPENSHIFT_DB_PASSWORD="443fe90b3b7f644a8429ce39b6e698e7"
+               export OPENSHIFT_OV_DB_URL="jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ocm-prod)(PORT=1600))(CONNECT_DATA=(SERVICE_NAME=cafi2prd.cisco.com)))"
+               export OPENSHIFT_OV_DB_USERNAME="NLS_APPL"
+               export OPENSHIFT_OV_DB_PASSWORD="c1e9cc50d558dd0e8e02f663ded200ea"
+               ;;
+ 
+  *) export JAVA_OPTS_EXT="${JAVA_OPTS_EXT} -Dcisco.life=dev"
+  export OPENSHIFT_DB_URL="jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ocm-i-nprd)(PORT=1600)) (CONNECT_DATA=(SERVICE_NAME=CAFI7DEV.CISCO.COM)))"
+               export OPENSHIFT_DB_USERNAME="IMS_APPL"
+               export OPENSHIFT_DB_PASSWORD="bad438ec572dcdb2be744753dc47e209"
+               export OPENSHIFT_OV_DB_URL="jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ocm-i-nprd)(PORT=1600))(CONNECT_DATA=(SERVICE_NAME=cafi2stg.cisco.com)))"
+               export OPENSHIFT_OV_DB_USERNAME="NRT_ADMIN"
+               export OPENSHIFT_OV_DB_PASSWORD="6ad8d876ccc6351a30a44001603dd9f9"
+               ;;
+esac

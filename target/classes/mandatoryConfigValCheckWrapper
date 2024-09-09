@@ -1,0 +1,26 @@
+#############################################################################################################
+#	PURPOSE : Check script is used as wrapper to run mandatory configuration script for troubleshooting.#
+#	INPUT   : appId and Domain is passed as input for the script					    #
+#	EXECUTE : /bin/sh check <appId> <domain>		 					    #
+#############################################################################################################
+app=$1
+vlae=$2
+filename="/opt/gen/xxlaeadm/test/$app.$vlae.txt"
+configFile="/opt/gen/xxlaeadm/test/laeMandatoryConfigValCheck"
+rhc app show -n $vlae -a $app -g ssh >gear_ssh_url.$app.$vlae;
+#cat gear_ssh_url.$app.$vlae
+sort  gear_ssh_url.$app.$vlae >> gear_ssh_url.$app.$vlae.tmp
+mv gear_ssh_url.$app.$vlae.tmp gear_ssh_url.$app.$vlae
+rm -rf gear_ssh_url.$app.$vlae.tmp
+for f in `cat gear_ssh_url.$app.$vlae`
+do
+        echo -n "Gear=$f," 
+	a=`ssh -q $f "hostname"|awk '{print $0}'`
+	echo "host: $a Gear: $f"
+	mkdir -p /tmp/$app
+	ssh -q $f "bash -s" < $configFile        
+done
+cp -r *.output.txt /tmp/$app
+rm -rf *.output.txt
+rm -rf gear_ssh_url.$app.$vlae
+echo -e "\e[1;34mYou can find the output file at /tmp/$app\e[0m"
